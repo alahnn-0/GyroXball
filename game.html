@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GYRO BALL — Tilt &amp; Balance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:        #0B0E14;
+    --panel:     #11151D;
+    --cream:     #F5F0E6;
+    --vermilion: #FF5A3C;
+    --mint:      #3DDC97;
+    --steel:     #7A8699;
+    --steel-dim: #475061;
+    --line:      #232A36;
+  }
+
+  *{ box-sizing: border-box; }
+
+  @font-face {
+    font-family: 'fallback-mono';
+    src: local('Menlo'), local('Consolas');
+  }
+
+  html, body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--cream);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body{
+    background-image:
+      radial-gradient(circle at 15% -10%, rgba(255,90,60,0.07), transparent 45%),
+      radial-gradient(circle at 90% 110%, rgba(61,220,151,0.06), transparent 45%);
+  }
+
+  .stage{
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+
+  /* ---------- Header / masthead ---------- */
+  .masthead{
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 22px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .wordmark{
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .wordmark span{ color: var(--vermilion); }
+
+  .wordmark-sub{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--steel);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .conn-badge{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--steel);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    border-radius: 6px;
+  }
+  .led{
+    width:8px; height:8px; border-radius:50%;
+    background: var(--steel-dim);
+    box-shadow: 0 0 0 0 rgba(61,220,151,0);
+    transition: background .2s, box-shadow .2s;
+  }
+  .led.live{
+    background: var(--mint);
+    box-shadow: 0 0 8px 2px rgba(61,220,151,0.55);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .led.sim{
+    background: var(--vermilion);
+    box-shadow: 0 0 8px 2px rgba(255,90,60,0.5);
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.45; }
+  }
+
+  /* ---------- Telemetry strip ---------- */
+  .telemetry{
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow:hidden;
+    margin-bottom: 18px;
+  }
+  .tcell{
+    background: var(--panel);
+    padding: 14px 16px;
+  }
+  .tlabel{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-bottom: 6px;
+  }
+  .tvalue{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--cream);
+    line-height:1;
+  }
+  .tvalue.accent{ color: var(--mint); }
+  .tvalue.danger{ color: var(--vermilion); }
+  .tunit{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--steel);
+    margin-left: 4px;
+  }
+
+  /* ---------- Game frame ---------- */
+  .game-frame{
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 30px 60px -30px rgba(0,0,0,0.6);
+  }
+
+  canvas{
+    display:block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #06080C;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    touch-action: none;
+  }
+
+  /* ---------- Overlay (start / game over) ---------- */
+  .overlay{
+    position:absolute;
+    inset: 18px;
+    border-radius: 10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(6,8,12,0.82);
+    backdrop-filter: blur(3px);
+    opacity:1;
+    transition: opacity .25s ease;
+  }
+  .overlay.hidden{
+    opacity:0;
+    pointer-events:none;
+  }
+  .overlay-card{
+    text-align:center;
+    max-width: 380px;
+    padding: 0 20px;
+  }
+  .overlay-eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-bottom: 10px;
+  }
+  .overlay-eyebrow.danger{ color: var(--vermilion); }
+  .overlay-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 34px;
+    font-weight: 700;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  .overlay-desc{
+    font-size: 14px;
+    color: var(--steel);
+    line-height: 1.55;
+    margin-bottom: 22px;
+  }
+  .overlay-stats{
+    display:flex;
+    gap: 28px;
+    justify-content:center;
+    margin-bottom: 24px;
+  }
+  .ostat-num{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--mint);
+    line-height: 1;
+  }
+  .ostat-num.best{ color: var(--vermilion); }
+  .ostat-label{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--steel);
+    margin-top: 4px;
+  }
+
+  .btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border: none;
+    border-radius: 8px;
+    padding: 13px 30px;
+    cursor: pointer;
+    background: var(--vermilion);
+    color: #1a0a05;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover{ transform: translateY(-1px); box-shadow: 0 8px 20px -8px rgba(255,90,60,0.6); }
+  .btn:active{ transform: translateY(0); }
+  .btn:focus-visible{ outline: 2px solid var(--mint); outline-offset: 2px; }
+
+  .btn-ghost{
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--cream);
+    margin-left: 10px;
+  }
+  .btn-ghost:hover{ border-color: var(--steel); box-shadow:none; }
+
+  /* ---------- Live HUD on canvas ---------- */
+  .hud{
+    position:absolute;
+    top: 30px; left: 30px;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--cream);
+    background: rgba(6,8,12,0.55);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    line-height: 1.6;
+    pointer-events:none;
+  }
+  .hud b{ color: var(--mint); font-weight: 600; }
+  .hud .danger-text{ color: var(--vermilion); }
+
+  /* ---------- Footer / instructions ---------- */
+  .instructions{
+    margin-top: 18px;
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .instructions p{
+    font-size: 12.5px;
+    color: var(--steel);
+    line-height: 1.6;
+    max-width: 480px;
+    margin: 0;
+  }
+  .instructions code{
+    font-family:'JetBrains Mono', monospace;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--mint);
+    font-size: 11.5px;
+  }
+
+  .mode-toggle{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--steel);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .mode-toggle:hover{ border-color: var(--steel); color: var(--cream); }
+
+  @media (max-width: 560px){
+    .telemetry{ grid-template-columns: repeat(2, 1fr); }
+    .wordmark{ font-size: 22px; }
+    .overlay-title{ font-size: 26px; }
+    .overlay-stats{ gap: 18px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .led.live{ animation: none; }
+    .btn{ transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <div class="masthead">
+    <div>
+      <div class="wordmark">GYRO<span>·</span>BALL</div>
+      <div class="wordmark-sub">Tilt-Balance Instrument · MPU6050</div>
+    </div>
+    <div class="conn-badge" id="connBadge">
+      <div class="led" id="connLed"></div>
+      <span id="connText">Connecting…</span>
+    </div>
+  </div>
+
+  <div class="telemetry">
+    <div class="tcell">
+      <div class="tlabel">Pitch</div>
+      <div class="tvalue" id="readPitch">0.0<span class="tunit">°</span></div>
+    </div>
+    <div class="tcell">
+      <div class="tlabel">Roll</div>
+      <div class="tvalue" id="readRoll">0.0<span class="tunit">°</span></div>
+    </div>
+    <div class="tcell">
+      <div class="tlabel">Bounces</div>
+      <div class="tvalue accent" id="readBounces">0</div>
+    </div>
+    <div class="tcell">
+      <div class="tlabel">Best run</div>
+      <div class="tvalue" id="readBest">0</div>
+    </div>
+  </div>
+
+  <div class="game-frame">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="hud" id="hud" style="display:none;">
+      Live tilt &nbsp;<b id="hudPitch">0.0°</b> / <b id="hudRoll">0.0°</b>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="overlay-card">
+        <div class="overlay-eyebrow" id="ovEyebrow">Ready when you are</div>
+        <h1 class="overlay-title" id="ovTitle">Keep it bouncing</h1>
+        <p class="overlay-desc" id="ovDesc">
+          A ball drops onto the platform and bounces with real physics.
+          Tilt the sensor to roll it back toward center — let it reach
+          an edge, and the run ends.
+        </p>
+        <div class="overlay-stats" id="ovStats" style="display:none;">
+          <div>
+            <div class="ostat-num" id="finalBounces">0</div>
+            <div class="ostat-label">Bounces</div>
+          </div>
+          <div>
+            <div class="ostat-num best" id="finalBest">0</div>
+            <div class="ostat-label">Best run</div>
+          </div>
+        </div>
+        <div>
+          <button class="btn" id="startBtn">Drop the ball</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <p>
+      Physically tilt the breadboard to shift <code>pitch</code> / <code>roll</code> —
+      the platform mirrors it live and gravity does the rest.
+      No hardware connected yet? <span id="simHint">Use your mouse or arrow keys to steer instead.</span>
+    </p>
+    <button class="mode-toggle" id="modeToggle">Switch to simulated tilt</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- Canvas & sizing ----------------
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // ---------------- DOM refs ----------------
+  const elPitch   = document.getElementById('readPitch');
+  const elRoll    = document.getElementById('readRoll');
+  const elBounces = document.getElementById('readBounces');
+  const elBest    = document.getElementById('readBest');
+  const connLed   = document.getElementById('connLed');
+  const connText  = document.getElementById('connText');
+  const overlay   = document.getElementById('overlay');
+  const ovEyebrow = document.getElementById('ovEyebrow');
+  const ovTitle   = document.getElementById('ovTitle');
+  const ovDesc    = document.getElementById('ovDesc');
+  const ovStats   = document.getElementById('ovStats');
+  const finalBounces = document.getElementById('finalBounces');
+  const finalBest    = document.getElementById('finalBest');
+  const startBtn  = document.getElementById('startBtn');
+  const hud       = document.getElementById('hud');
+  const hudPitch  = document.getElementById('hudPitch');
+  const hudRoll   = document.getElementById('hudRoll');
+  const modeToggle = document.getElementById('modeToggle');
+  const simHint    = document.getElementById('simHint');
+
+  // ---------------- State ----------------
+  let liveTilt = { pitch: 0, roll: 0 };   // raw degrees from ESP32
+  let smoothTilt = { x: 0, y: 0 };        // smoothed, used for physics (-1..1 range-ish)
+  let usingSimMode = false;
+  let wsConnected = false;
+  let bestRun = parseInt(localStorage.getItem('gyroball_best') || '0', 10);
+  elBest.innerHTML = bestRun + '';
+
+  const MAX_TILT_DEG = 28;   // degrees mapped to full board tilt visually & physically
+
+  // Platform geometry (the "board" the ball balances on)
+  const board = {
+    cx: W/2, cy: H/2,
+    halfW: 260,
+    halfH: 150,
+    angleX: 0,   // visual roll (left/right) radians
+    angleY: 0    // visual pitch (fwd/back), used to skew perspective only
+  };
+
+  // Ball physics state
+  let ball = null;
+  let bounceCount = 0;
+  let gameRunning = false;
+  let gameOverFired = false;
+
+  const DROP_HEIGHT = 260;  // pseudo-height the ball starts falling from
+
+  function resetBall(){
+    ball = {
+      x: board.cx, y: board.cy,     // always the in-plane (board) position
+      vx: 0, vy: 0,
+      z: DROP_HEIGHT, vz: 0,        // height above the board surface (visual + drop timing only)
+      radius: 16,
+      onBoard: false
+    };
+    bounceCount = 0;
+    gameOverFired = false;
+    elBounces.textContent = '0';
+  }
+  resetBall();
+
+  // ---------------- Connection: WebSocket with simulated fallback ----------------
+  let ws = null;
+  let wsRetryTimer = null;
+
+  function setConnUI(state){
+    // state: 'connecting' | 'live' | 'sim' | 'lost'
+    connLed.classList.remove('live','sim');
+    if(state === 'live'){
+      connLed.classList.add('live');
+      connText.textContent = 'MPU6050 live';
+    } else if(state === 'sim'){
+      connLed.classList.add('sim');
+      connText.textContent = 'Simulated input';
+    } else if(state === 'lost'){
+      connText.textContent = 'Connection lost — retrying…';
+    } else {
+      connText.textContent = 'Connecting…';
+    }
+  }
+
+  function connectWebSocket(){
+    if(usingSimMode) return;
+    try{
+      const proto = (location.protocol === 'https:') ? 'wss://' : 'ws://';
+      const host = location.host || '192.168.1.1';
+      ws = new WebSocket(proto + host + '/ws');
+
+      ws.onopen = () => {
+        wsConnected = true;
+        setConnUI('live');
+        clearTimeout(wsRetryTimer);
+      };
+      ws.onmessage = (evt) => {
+        try{
+          const data = JSON.parse(evt.data);
+          if(typeof data.pitch === 'number') liveTilt.pitch = data.pitch;
+          if(typeof data.roll  === 'number') liveTilt.roll  = data.roll;
+        }catch(e){ /* ignore malformed frame */ }
+      };
+      ws.onclose = () => {
+        wsConnected = false;
+        if(!usingSimMode){
+          setConnUI('lost');
+          wsRetryTimer = setTimeout(connectWebSocket, 1500);
+        }
+      };
+      ws.onerror = () => { /* onclose will handle retry */ };
+    }catch(e){
+      setConnUI('lost');
+      wsRetryTimer = setTimeout(connectWebSocket, 1500);
+    }
+  }
+
+  // Fallback: if no WS connects within 4s, hint the user they can simulate
+  let autoHintShown = false;
+  setTimeout(() => {
+    if(!wsConnected && !usingSimMode && !autoHintShown){
+      autoHintShown = true;
+      connText.textContent = 'No sensor found — try simulated tilt';
+    }
+  }, 4000);
+
+  connectWebSocket();
+
+  // ---------------- Simulated input (mouse / keyboard) ----------------
+  const simState = { roll: 0, pitch: 0 };   // final combined value used by physics
+  const mouseTilt = { roll: 0, pitch: 0 };  // sticky - persists until mouse moves again
+  const keyTilt = { roll: 0, pitch: 0 };    // spring-back toward zero
+  const keys = {};
+  let mouseActive = false;
+
+  window.addEventListener('keydown', (e) => {
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) e.preventDefault();
+    keys[e.key] = true;
+  });
+  window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if(!usingSimMode) return;
+    mouseActive = true;
+    const rect = canvas.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;   // -1..1
+    const ny = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    mouseTilt.roll  = Math.max(-1, Math.min(1, nx)) * MAX_TILT_DEG;
+    mouseTilt.pitch = Math.max(-1, Math.min(1, ny)) * MAX_TILT_DEG;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    mouseActive = false;
+    mouseTilt.roll = 0;
+    mouseTilt.pitch = 0;
+  });
+
+  function updateSimKeys(){
+    const step = 1.1;
+    if(keys['ArrowLeft'])  keyTilt.roll  -= step;
+    if(keys['ArrowRight']) keyTilt.roll  += step;
+    if(keys['ArrowUp'])    keyTilt.pitch -= step;
+    if(keys['ArrowDown'])  keyTilt.pitch += step;
+    keyTilt.roll  *= 0.94;   // spring back toward level
+    keyTilt.pitch *= 0.94;
+    keyTilt.roll  = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, keyTilt.roll));
+    keyTilt.pitch = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, keyTilt.pitch));
+
+    // Combine mouse (sticky) + keyboard (spring-back) sources, clamped to range
+    simState.roll  = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, mouseTilt.roll  + keyTilt.roll));
+    simState.pitch = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, mouseTilt.pitch + keyTilt.pitch));
+  }
+
+  modeToggle.addEventListener('click', () => {
+    usingSimMode = !usingSimMode;
+    if(usingSimMode){
+      if(ws) ws.close();
+      clearTimeout(wsRetryTimer);
+      setConnUI('sim');
+      modeToggle.textContent = 'Switch to live sensor';
+      simHint.textContent = 'Move your mouse over the board, or use arrow keys, to tilt it.';
+    } else {
+      modeToggle.textContent = 'Switch to simulated tilt';
+      simHint.textContent = 'Use your mouse or arrow keys to steer instead.';
+      setConnUI('connecting');
+      connectWebSocket();
+    }
+  });
+
+  // ---------------- Physics constants ----------------
+  const GRAVITY = 1450;       // px/s^2 equivalent, tuned for feel
+  const DROP_GRAVITY = 1800;  // gravity while ball is "above" the board (z>0)
+  const RESTITUTION = 0.62;   // bounce energy retained
+  const FRICTION = 0.989;     // rolling friction per frame
+  const TILT_FORCE = 9.2;     // how strongly board angle accelerates the ball
+  const MAX_SPEED = 900;
+
+  let lastT = performance.now();
+
+  function getActiveTilt(){
+    if(usingSimMode){
+      return { pitch: simState.pitch, roll: simState.roll };
+    }
+    return { pitch: liveTilt.pitch, roll: liveTilt.roll };
+  }
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  // ---------------- Main loop ----------------
+  function step(now){
+    let dt = (now - lastT) / 1000;
+    dt = clamp(dt, 0, 0.04);
+    lastT = now;
+
+    if(usingSimMode) updateSimKeys();
+
+    const tilt = getActiveTilt();
+
+    // Smooth displayed/physics tilt a touch for stability
+    smoothTilt.x += (tilt.roll  - smoothTilt.x) * 0.25;
+    smoothTilt.y += (tilt.pitch - smoothTilt.y) * 0.25;
+
+    board.angleX = clamp(smoothTilt.x, -MAX_TILT_DEG, MAX_TILT_DEG) * Math.PI / 180;
+    board.angleY = clamp(smoothTilt.y, -MAX_TILT_DEG, MAX_TILT_DEG) * Math.PI / 180;
+
+    // Update telemetry text
+    elPitch.innerHTML = smoothTilt.y.toFixed(1) + '<span class="tunit">°</span>';
+    elRoll.innerHTML  = smoothTilt.x.toFixed(1) + '<span class="tunit">°</span>';
+    hudPitch.textContent = smoothTilt.y.toFixed(1) + '°';
+    hudRoll.textContent  = smoothTilt.x.toFixed(1) + '°';
+
+    if(gameRunning) updatePhysics(dt);
+    render();
+
+    requestAnimationFrame(step);
+  }
+
+  function updatePhysics(dt){
+    if(!ball) return;
+
+    if(!ball.onBoard){
+      // Falling toward the board from above
+      ball.vz -= DROP_GRAVITY * dt;
+      ball.z  += ball.vz * dt;
+      if(ball.z <= 0){
+        ball.z = 0;
+        ball.onBoard = true;
+        ball.vz = -Math.abs(ball.vz) * RESTITUTION; // first impact bounce
+        bounceCount++;
+        elBounces.textContent = bounceCount;
+        triggerBoardFlash();
+      }
+      // Slight drift toward board tilt even while falling, for visual continuity
+      ball.x += board.angleX * 40 * dt;
+      ball.y += board.angleY * 40 * dt;
+    } else {
+      // Rolling / bouncing on the board surface
+      const ax = Math.sin(board.angleX) * TILT_FORCE * 60;
+      const ay = Math.sin(board.angleY) * TILT_FORCE * 60;
+
+      ball.vx += ax * dt;
+      ball.vy += ay * dt;
+
+      ball.vx *= FRICTION;
+      ball.vy *= FRICTION;
+
+      ball.vx = clamp(ball.vx, -MAX_SPEED, MAX_SPEED);
+      ball.vy = clamp(ball.vy, -MAX_SPEED, MAX_SPEED);
+
+      ball.x += ball.vx * dt;
+      ball.y += ball.vy * dt;
+
+      // small vertical "bounce" feel even while rolling, decaying
+      ball.vz -= GRAVITY * dt * 0.15;
+      ball.z  += ball.vz * dt;
+      if(ball.z < 0){
+        ball.z = 0;
+        if(Math.abs(ball.vz) > 40){
+          ball.vz = -ball.vz * RESTITUTION * 0.5;
+          bounceCount++;
+          elBounces.textContent = bounceCount;
+        } else {
+          ball.vz = 0;
+        }
+      }
+    }
+
+    // Check edges -> fall off board -> game over (only once ball has landed)
+    if(ball.onBoard){
+      const localX = ball.x - board.cx;
+      const localY = ball.y - board.cy;
+      const margin = ball.radius * 0.35;
+
+      if(Math.abs(localX) > board.halfW + margin || Math.abs(localY) > board.halfH + margin){
+        if(!gameOverFired){
+          gameOverFired = true;
+          endGame();
+        }
+      }
+    }
+  }
+
+  let flashTimer = 0;
+  function triggerBoardFlash(){ flashTimer = 0.12; }
+
+  // ---------------- Rendering ----------------
+  function render(){
+    ctx.clearRect(0,0,W,H);
+
+    // Background grid (subtle, instrument-panel feel)
+    drawBackground();
+
+    // Board (drawn with pseudo-3D skew based on tilt)
+    drawBoard();
+
+    // Ball
+    if(ball) drawBall();
+
+    if(flashTimer > 0) flashTimer -= 1/60;
+  }
+
+  function drawBackground(){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(122,134,153,0.07)';
+    ctx.lineWidth = 1;
+    const step = 40;
+    for(let x=0; x<=W; x+=step){
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    for(let y=0; y<=H; y+=step){
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function boardCorners(){
+    // Apply simple pseudo-3D: roll shifts left/right edges vertically,
+    // pitch shifts top/bottom edges, creating a tilted-plane illusion.
+    const hw = board.halfW, hh = board.halfH;
+    const rollShift  = Math.sin(board.angleX) * 60;
+    const pitchShift = Math.sin(board.angleY) * 40;
+
+    const pts = [
+      { x: -hw, y: -hh }, // top-left
+      { x:  hw, y: -hh }, // top-right
+      { x:  hw, y:  hh }, // bottom-right
+      { x: -hw, y:  hh }, // bottom-left
+    ];
+
+    return pts.map(p => {
+      const sideFactor = p.x / hw;   // -1 (left) .. 1 (right)
+      const vertFactor = p.y / hh;   // -1 (top) .. 1 (bottom)
+      return {
+        x: board.cx + p.x,
+        y: board.cy + p.y + sideFactor * rollShift + vertFactor * pitchShift
+      };
+    });
+  }
+
+  function drawBoard(){
+    const corners = boardCorners();
+
+    // Shadow beneath board
+    ctx.save();
+    ctx.translate(0, 10);
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    corners.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.filter = 'blur(8px)';
+    ctx.fill();
+    ctx.filter = 'none';
+    ctx.restore();
+
+    // Board surface
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y);
+    corners.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.closePath();
+
+    const grad = ctx.createLinearGradient(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+    grad.addColorStop(0, '#1B2230');
+    grad.addColorStop(1, '#141A24');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = flashTimer > 0 ? 'rgba(61,220,151,0.9)' : 'rgba(122,134,153,0.45)';
+    ctx.stroke();
+
+    // Center crosshair (spirit-level marking)
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(122,134,153,0.3)';
+    ctx.lineWidth = 1;
+    ctx.moveTo(board.cx - 14, board.cy);
+    ctx.lineTo(board.cx + 14, board.cy);
+    ctx.moveTo(board.cx, board.cy - 14);
+    ctx.lineTo(board.cx, board.cy + 14);
+    ctx.stroke();
+
+    // Edge danger tint near boundary
+    ctx.restore();
+
+    // Etched angle readout on the board itself (signature element)
+    ctx.save();
+    ctx.font = "600 13px 'JetBrains Mono', monospace";
+    ctx.fillStyle = 'rgba(245,240,230,0.55)';
+    ctx.textAlign = 'center';
+    const angleLabel = `${smoothTilt.x.toFixed(1)}° / ${smoothTilt.y.toFixed(1)}°`;
+    ctx.fillText(angleLabel, board.cx, board.cy + board.halfH + 26);
+    ctx.restore();
+  }
+
+  function drawBall(){
+    if(!ball) return;
+
+    // Drop shadow grows smaller as ball "height" (z) increases (still above board)
+    const shadowScale = ball.onBoard ? 1 : clamp(1 - ball.z/300, 0.35, 1);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(ball.x, board.cy + (ball.y-board.cy), ball.radius*0.9*shadowScale, ball.radius*0.35*shadowScale, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fill();
+    ctx.restore();
+
+    const visualY = ball.y - (ball.onBoard ? 0 : ball.z * 0.6);
+
+    ctx.save();
+    const ballGrad = ctx.createRadialGradient(ball.x-5, visualY-5, 2, ball.x, visualY, ball.radius);
+    ballGrad.addColorStop(0, '#FF8166');
+    ballGrad.addColorStop(1, '#E1462D');
+    ctx.beginPath();
+    ctx.arc(ball.x, visualY, ball.radius, 0, Math.PI*2);
+    ctx.fillStyle = ballGrad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------------- Game flow ----------------
+  function startGame(){
+    resetBall();
+    gameRunning = true;
+    overlay.classList.add('hidden');
+    hud.style.display = 'block';
+  }
+
+  function endGame(){
+    gameRunning = false;
+    hud.style.display = 'none';
+
+    if(bounceCount > bestRun){
+      bestRun = bounceCount;
+      localStorage.setItem('gyroball_best', String(bestRun));
+      elBest.textContent = bestRun;
+    }
+
+    ovEyebrow.textContent = 'Run over';
+    ovEyebrow.classList.add('danger');
+    ovTitle.textContent = 'It rolled off the edge';
+    ovDesc.textContent = 'Level the board fast on the next drop to keep the ball near center before it gathers speed.';
+    ovStats.style.display = 'flex';
+    finalBounces.textContent = bounceCount;
+    finalBest.textContent = bestRun;
+    startBtn.textContent = 'Retry';
+    overlay.classList.remove('hidden');
+  }
+
+  startBtn.addEventListener('click', startGame);
+
+  // Kick off render loop immediately (idle state visible before first start)
+  requestAnimationFrame(step);
+
+})();
+</script>
+</body>
+</html>
